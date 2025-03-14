@@ -1,9 +1,9 @@
 <?php
 $editorContent = "";
 $submittedContent = "";
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['rteContent'])) {
-    // In a production app, be sure to sanitize this output.
-    $editorContent = $_POST['rteContent'];
+    $editorContent = $_POST['rteContent']; // Sanitize for production
     $submittedContent = $editorContent;
 }
 ?>
@@ -12,54 +12,44 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['rteContent'])) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Standalone RTE Form</title>
+  <title>Rich Text Editor Form</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
   <style>
     .rte-editor {
       border: 1px solid #ccc;
       padding: 10px;
       min-height: 200px;
-      overflow: auto;
       background-color: #fff;
+      overflow: auto;
     }
     .source-code {
       display: none;
-      white-space: pre-wrap;
+      width: 100%;
+      min-height: 200px;
       border: 1px solid #ccc;
       padding: 10px;
-      min-height: 200px;
       background-color: #f9f9f9;
+      font-family: monospace;
+      white-space: pre-wrap;
     }
-    /* Mobile styles */
     @media (max-width: 768px) {
-      .toolbar-collapse {
-        display: none;
-      }
-      /* When .open is added, show the toolbar */
-      .toolbar-collapse.open {
-        display: block;
-      }
-      .hamburger {
-        display: inline-block;
-      }
+      .toolbar-collapse { display: none; }
+      .toolbar-collapse.open { display: block; }
+      .hamburger { display: inline-block; }
     }
-    /* Desktop styles */
     @media (min-width: 769px) {
-      .toolbar-collapse {
-        display: block;
-      }
-      .hamburger {
-        display: none;
-      }
+      .toolbar-collapse { display: block; }
+      .hamburger { display: none; }
     }
   </style>
 </head>
 <body class="bg-light p-4">
   <div class="container">
     <h3>Rich Text Editor Form</h3>
-    <!-- Form submits to itself -->
+
     <form id="rteForm" method="post" action="">
       <button type="button" class="btn btn-outline-secondary hamburger mb-2" onclick="toggleToolbar()">☰ Tools</button>
+
       <div class="rte-toolbar toolbar-collapse mb-2">
         <div class="btn-group mb-2">
           <button type="button" class="btn btn-outline-secondary" onclick="formatText('bold')"><b>B</b></button>
@@ -86,77 +76,89 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['rteContent'])) {
         </div>
       </div>
 
-      <!-- Rich text editor starts with content if previously submitted -->
+      <!-- Rich Text Editor -->
       <div id="rteEditor" class="rte-editor" contenteditable="true"><?php echo $editorContent; ?></div>
-      <!-- Hidden input to capture the editor's HTML content -->
+
+      <!-- Source Code View -->
+      <textarea id="sourceView" class="source-code" spellcheck="false"></textarea>
+
+      <!-- Hidden Input -->
       <input type="hidden" id="rteContent" name="rteContent">
-      
-      <!-- Green submit button and clear button -->
-      <button type="submit" class="btn btn-success mt-2">Submit</button>
-      <button type="button" class="btn btn-warning mt-2 ml-2" onclick="clearEditor()">Clear</button>
+
+      <button type="submit" class="btn btn-success mt-3">Submit</button>
+      <button type="button" class="btn btn-warning mt-3 ml-2" onclick="clearEditor()">Clear</button>
     </form>
 
-    <!-- Output section to display submitted content -->
     <?php if (!empty($submittedContent)): ?>
       <div class="mt-4">
         <h4>Output</h4>
-        <div id="output" class="border p-3">
-          <?php echo $submittedContent; ?>
-        </div>
+        <div id="output" class="border p-3"><?php echo $submittedContent; ?></div>
       </div>
     <?php endif; ?>
   </div>
 
   <script>
-    function formatText(command) {
-      document.execCommand(command, false, null);
+    let isSourceMode = false;
+
+    function formatText(cmd) {
+      document.execCommand(cmd, false, null);
     }
+
     function createLink() {
       var url = prompt("Enter the URL", "https://");
       if (url) document.execCommand("createLink", false, url);
     }
-    // This clears formatting but preserves text content.
+
     function clearFormatting() {
-      let editor = document.getElementById("rteEditor");
+      const editor = document.getElementById("rteEditor");
       editor.innerHTML = editor.textContent;
     }
-    // Clears all content in the editor and the output area.
+
     function clearEditor() {
       document.getElementById("rteEditor").innerHTML = "";
-      var output = document.getElementById("output");
-      if (output) {
-        output.innerHTML = "";
-      }
+      document.getElementById("sourceView").value = "";
+      const output = document.getElementById("output");
+      if (output) output.innerHTML = "";
     }
-    // Toggle the toolbar display.
+
     function toggleToolbar() {
       document.querySelector('.toolbar-collapse').classList.toggle('open');
     }
-    // On window resize, ensure the toolbar is visible on desktop.
-    window.addEventListener('resize', function() {
-      var toolbar = document.querySelector('.toolbar-collapse');
-      if (window.innerWidth >= 769) {
-        toolbar.classList.remove('open');
-      }
-    });
+
     function toggleSourceView() {
-      var editor = document.getElementById("rteEditor");
-      var source = document.getElementById("sourceView");
-      if (source.style.display === "none" || source.style.display === "") {
-        source.textContent = editor.innerHTML;
+      const editor = document.getElementById("rteEditor");
+      const source = document.getElementById("sourceView");
+
+      if (!isSourceMode) {
+        source.value = editor.innerHTML.trim();
         source.style.display = "block";
         editor.style.display = "none";
+        isSourceMode = true;
       } else {
-        editor.innerHTML = source.textContent;
-        source.style.display = "none";
+        editor.innerHTML = source.value;
         editor.style.display = "block";
+        source.style.display = "none";
+        isSourceMode = false;
       }
     }
-    // Before the form submits, copy the RTE content into the hidden input.
-    document.getElementById('rteForm').addEventListener('submit', function() {
-      document.getElementById('rteContent').value = document.getElementById('rteEditor').innerHTML;
+
+    // On form submit, copy from correct view to hidden input
+    document.getElementById("rteForm").addEventListener("submit", function () {
+      if (isSourceMode) {
+        document.getElementById("rteContent").value = document.getElementById("sourceView").value;
+      } else {
+        document.getElementById("rteContent").value = document.getElementById("rteEditor").innerHTML;
+      }
+    });
+
+    // Sync source textarea on load (in case content already exists)
+    window.addEventListener("DOMContentLoaded", function () {
+      const editor = document.getElementById("rteEditor");
+      const source = document.getElementById("sourceView");
+      source.value = editor.innerHTML.trim();
     });
   </script>
 </body>
 </html>
+
 
